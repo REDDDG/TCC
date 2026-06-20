@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package branch;
+option go_package = "tcc/api/proto/branch";
+
+service BranchService {
+  rpc Try(TryRequest) returns (TryResponse);
+  rpc Confirm(ConfirmRequest) returns (ConfirmResponse);
+  rpc Cancel(CancelRequest) returns (CancelResponse);
+}
+
+message TryRequest {
+  string xid = 1;
+  string resource_data = 2;
+}
+
+message TryResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message ConfirmRequest {
+  string xid = 1;
+}
+
+message ConfirmResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message CancelRequest {
+  string xid = 1;
+}
+
+message CancelResponse {
+  bool success = 1;
+  string error = 2;
+}

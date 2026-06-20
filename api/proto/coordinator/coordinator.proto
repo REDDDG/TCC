@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+package coordinator;
+option go_package = "tcc/api/proto/coordinator";
+
+service TCCCoordinator {
+  rpc Begin(BeginRequest) returns (BeginResponse);
+  rpc Commit(CommitRequest) returns (CommitResponse);
+  rpc Cancel(CancelRequest) returns (CancelResponse);
+  rpc GetStatus(StatusRequest) returns (StatusResponse);
+}
+
+message BeginRequest {
+  repeated Participant participants = 1;
+  int32 timeout = 2;
+}
+
+message Participant {
+  string service_name = 1;
+  string resource_data = 2;
+  string address = 3;
+}
+
+message BeginResponse {
+  string xid = 1;
+  bool success = 2;
+  string error = 3;
+  repeated BranchResult branch_results = 4;
+}
+
+message BranchResult {
+  string service_name = 1;
+  bool success = 2;
+  string error = 3;
+}
+
+message CommitRequest {
+  string xid = 1;
+}
+
+message CommitResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message CancelRequest {
+  string xid = 1;
+}
+
+message CancelResponse {
+  bool success = 1;
+  string error = 2;
+}
+
+message StatusRequest {
+  string xid = 1;
+}
+
+message StatusResponse {
+  string xid = 1;
+  string status = 2;
+  repeated BranchStatus branch_statuses = 3;
+}
+
+message BranchStatus {
+  string service_name = 1;
+  string status = 2;
+}
