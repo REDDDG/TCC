@@ -47,6 +47,8 @@ type Transaction struct {
 	XID        string               `json:"xid"`         // 全局事务唯一标识（UUID）
 	Status     TxStatus             `json:"status"`      // 当前全局事务状态
 	Branches   []*BranchTransaction `json:"branches"`    // 所有分支事务列表
+	Timeout    int                  `json:"timeout"`     // 超时时间（秒），默认 30
+	RetryCount int                  `json:"retry_count"` // 恢复器重试次数
 	CreateTime time.Time            `json:"create_time"` // 事务创建时间
 	UpdateTime time.Time            `json:"update_time"` // 最后一次状态变更时间
 }
@@ -54,12 +56,17 @@ type Transaction struct {
 // NewTransaction 创建一个新的全局事务，初始状态为 StatusTrying。
 //   - xid: 全局事务唯一标识，由调用方生成（UUID）
 //   - branches: 预初始化的分支事务列表，每个分支状态为 BranchInit
-func NewTransaction(xid string, branches []*BranchTransaction) *Transaction {
+//   - timeout: 超时秒数，若为 0 则默认 30 秒
+func NewTransaction(xid string, branches []*BranchTransaction, timeout int) *Transaction {
+	if timeout <= 0 {
+		timeout = 30
+	}
 	now := time.Now()
 	return &Transaction{
 		XID:        xid,
 		Status:     StatusTrying,
 		Branches:   branches,
+		Timeout:    timeout,
 		CreateTime: now,
 		UpdateTime: now,
 	}

@@ -2,7 +2,6 @@ package coordinator
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -53,7 +52,7 @@ func (h *GinHandler) CreateTransaction(c *gin.Context) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	participants := make([]*coordpb.Participant, len(req.Participants))
@@ -64,19 +63,14 @@ func (h *GinHandler) CreateTransaction(c *gin.Context) {
 			Address:      p.Address,
 		}
 	}
-	start := time.Now()
-
 	resp, err := h.client.Begin(ctx, &coordpb.BeginRequest{
 		Participants: participants,
 		Timeout:      req.Timeout,
 	})
-	end := time.Since(start)
-	fmt.Println("1:", end)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
 	c.JSON(http.StatusOK, resp)
 }
 
@@ -142,6 +136,11 @@ func (h *GinHandler) CommitTransaction(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+// Close 关闭 GinHandler 持有的 gRPC 客户端连接。
+func (h *GinHandler) Close() error {
+	return h.conn.Close()
+}
+
 // HealthCheck 处理 GET /api/v1/health
 // 返回协调器健康状态，用于前端健康栏展示。
 //   - c: Gin 上下文
@@ -152,4 +151,12 @@ func (h *GinHandler) HealthCheck(c *gin.Context) {
 		"role":   "leader",
 		"time":   time.Now().Format(time.RFC3339),
 	})
+}
+
+func (h *GinHandler) ClearAllTransaction(c *gin.Context) {
+	err := h.store.ClearAllTransactions()
+	if err != nil {
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{})
 }

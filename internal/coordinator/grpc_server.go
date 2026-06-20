@@ -39,10 +39,6 @@ func NewGRPCServer(store *Store) *GRPCServer {
 //   - req.Timeout: 预留字段，Phase 1 未使用
 //   - 返回: BeginResponse.Xid 为全局事务 ID；Success 为 true 表示全部 Try 通过；false 时已自动回滚
 func (s *GRPCServer) Begin(ctx context.Context, req *coordpb.BeginRequest) (*coordpb.BeginResponse, error) {
-	start := time.Now()
-	defer func() {
-		fmt.Println("2:", time.Since(start))
-	}()
 	xid := uuid.New().String()
 	log.Printf("[coordinator] Begin XID=%s, participants=%d", xid, len(req.Participants))
 
@@ -57,16 +53,14 @@ func (s *GRPCServer) Begin(ctx context.Context, req *coordpb.BeginRequest) (*coo
 		}
 	}
 
-	tx := model.NewTransaction(xid, branches)
+	tx := model.NewTransaction(xid, branches, int(req.Timeout))
 	s.store.Create(tx)
 
 	results := make([]*coordpb.BranchResult, len(req.Participants))
 	allOK := true
 
 	for i, p := range req.Participants {
-		istart := time.Now()
 		err := s.callBranchTry(branches[i], xid, p.ResourceData, p.Address)
-		fmt.Println("callBranchTry", i, ": ", time.Since(istart))
 		if err != nil {
 			results[i] = &coordpb.BranchResult{ServiceName: p.ServiceName, Success: false, Error: err.Error()}
 			allOK = false
@@ -218,7 +212,7 @@ func (s *GRPCServer) callBranchTry(br *model.BranchTransaction, xid, resourceDat
 	if err != nil {
 		return fmt.Errorf("getBranchClient %s: %w", addr, err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	start := time.Now()
 	resp, err := client.Try(ctx, &branchpb.TryRequest{Xid: xid, ResourceData: resourceData})

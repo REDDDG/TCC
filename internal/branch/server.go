@@ -8,7 +8,6 @@ import (
 	"math/rand"
 	"sync"
 	pb "tcc/api/proto/branch"
-	"time"
 )
 
 // Server 实现 BranchServiceServer 接口，模拟一个 TCC 分支服务。
@@ -36,13 +35,7 @@ func NewServer(name string) *Server {
 //   - req.ResourceData: 需要预留的资源描述
 //   - 返回: TryResponse.Success 为 true 表示预留成功；false 表示资源不足或已被取消
 func (s *Server) Try(ctx context.Context, req *pb.TryRequest) (*pb.TryResponse, error) {
-	start := time.Now()
 	s.mu.Lock()
-	defer func() {
-		s.mu.Unlock()
-		fmt.Println("Unlock", time.Since(start))
-	}()
-	fmt.Println("clientTry:", time.Since(start))
 	// 空回滚检测：Cancel 先于 Try 到达，直接拒绝防止悬挂资源
 	if st, ok := s.states[req.Xid]; ok && st == "cancelled" {
 		return &pb.TryResponse{Success: false, Error: "cancelled before try"}, nil
