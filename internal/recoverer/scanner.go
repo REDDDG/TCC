@@ -3,6 +3,7 @@ package recoverer
 import (
 	"context"
 	"log"
+	"tcc/internal/model"
 	"time"
 
 	"tcc/internal/repository"
@@ -76,10 +77,18 @@ func (s *TimeoutScanner) scanOnce() {
 	log.Printf("[scanner] found %d timed-out transaction(s)", len(txs))
 	for _, tx := range txs {
 		// 每个事务用独立 context 防止级联超时
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		if err := s.recoverer.Recover(ctx, tx); err != nil {
-			log.Printf("[scanner] recover XID=%s failed: %v", tx.XID, err)
+		if tx.RetryCount < 5 && tx.Status == model.StatusConfirming {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			if err := s.recoverer.Recover(ctx, tx); err != nil {
+				log.Printf("[scanner] Recover failed for tx %s: %v", tx.XID, err)
+			}
+			cancel()
+		} else {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			if err := s.recoverer.Cancel(ctx, tx); err != nil {
+				log.Printf("[scanner] cancel XID=%s failed: %v", tx.XID, err)
+			}
+			cancel()
 		}
-		cancel()
 	}
 }
