@@ -175,9 +175,14 @@ func (s *Store) LoadBranchDetails(xid string) (*model.Transaction, bool) {
 }
 
 func (s *Store) ClearAllTransactions() error {
-	err := s.repo.ClearAllTransactions(context.Background())
-	if err != nil {
-		return err
+	s.mu.Lock()
+	s.txs = make(map[string]*model.Transaction)
+	s.mu.Unlock()
+
+	if s.repo != nil {
+		if err := s.repo.ClearAllTransactions(context.Background()); err != nil {
+			return err
+		}
 	}
 	return nil
 }
