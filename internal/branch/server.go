@@ -36,6 +36,7 @@ func NewServer(name string) *Server {
 //   - 返回: TryResponse.Success 为 true 表示预留成功；false 表示资源不足或已被取消
 func (s *Server) Try(ctx context.Context, req *pb.TryRequest) (*pb.TryResponse, error) {
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	// 空回滚检测：Cancel 先于 Try 到达，直接拒绝防止悬挂资源
 	if st, ok := s.states[req.Xid]; ok && st == "cancelled" {
 		return &pb.TryResponse{Success: false, Error: "cancelled before try"}, nil
@@ -45,7 +46,7 @@ func (s *Server) Try(ctx context.Context, req *pb.TryRequest) (*pb.TryResponse, 
 	//time.Sleep(time.Duration(100+rand.Intn(400)) * time.Millisecond)
 
 	// 90% 成功率，模拟生产环境中资源不足的场景
-	if rand.Intn(10) < 2 {
+	if rand.Intn(10) < 1 {
 		return &pb.TryResponse{Success: false, Error: fmt.Sprintf("%s: resource occupied", s.ServiceName)}, nil
 	}
 

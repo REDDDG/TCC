@@ -117,25 +117,6 @@ func (h *GinHandler) GetTransaction(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// CommitTransaction 处理 POST /api/v1/transactions/:xid/commit
-// 通过 gRPC Commit 确认提交全局事务。
-//   - c: Gin 上下文，URL 参数 xid 指定事务 ID
-//   - 返回: JSON 格式的 CommitResponse
-func (h *GinHandler) CommitTransaction(c *gin.Context) {
-	xid := c.Param("xid")
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	resp, err := h.client.Commit(ctx, &coordpb.CommitRequest{Xid: xid})
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, resp)
-}
-
 // Close 关闭 GinHandler 持有的 gRPC 客户端连接。
 func (h *GinHandler) Close() error {
 	return h.conn.Close()

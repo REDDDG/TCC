@@ -73,21 +73,15 @@ func (s *GRPCServer) Begin(ctx context.Context, req *coordpb.BeginRequest) (*coo
 	}
 
 	if !allOK {
-		log.Printf("[coordinator] Begin XID=%s Try failed, starting Cancel for succeeded branches", xid)
-		tx.Status = model.StatusCancelling
-		for _, br := range branches {
-			if br.Status == model.BranchTryDone {
-				if err := s.callBranchCancel(br, xid, br.Address); err != nil {
-					log.Printf("[coordinator] Cancel branch %s failed: %v", br.ServiceName, err)
-				} else {
-					br.Status = model.BranchCancelDone
-				}
-			}
+		_, err := s.Cancel(ctx, &coordpb.CancelRequest{Xid: xid})
+		if err != nil {
+			return nil, err
 		}
-		tx.Status = model.StatusFailed
 	} else {
-		log.Printf("[coordinator] Begin XID=%s all Try OK, waiting for Commit/Cancel", xid)
-		tx.Status = model.StatusTrying
+		_, err := s.Commit(ctx, &coordpb.CommitRequest{Xid: xid})
+		if err != nil {
+			return nil, err
+		}
 	}
 	tx.UpdateTime = time.Now()
 	s.store.Update(tx)

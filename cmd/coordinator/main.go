@@ -91,7 +91,6 @@ func main() {
 		api.POST("/transactions", ginHandler.CreateTransaction)
 		api.GET("/transactions", ginHandler.ListTransactions)
 		api.GET("/transactions/:xid", ginHandler.GetTransaction)
-		api.POST("/transactions/:xid/commit", ginHandler.CommitTransaction)
 		api.GET("/health", ginHandler.HealthCheck)
 		api.POST("/clear", ginHandler.ClearAllTransaction)
 	}
