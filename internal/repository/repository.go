@@ -31,4 +31,7 @@ type Repository interface {
 
 	// ClearAllTransactions 删除所有事务
 	ClearAllTransactions(ctx context.Context) error
+
+	// AddRetryCount 重试计数+1
+	AddRetryCount(ctx context.Context, id string) error
 }

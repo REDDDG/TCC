@@ -18,6 +18,7 @@ type TimeoutScanner struct {
 	repo      repository.Repository
 	recoverer Recoverer
 	interval  time.Duration
+	txs       []*model.Transaction
 }
 
 // NewTimeoutScanner 创建超时扫描器。
@@ -78,7 +79,11 @@ func (s *TimeoutScanner) scanOnce() {
 	for _, tx := range txs {
 		// 每个事务用独立 context 防止级联超时
 		if tx.RetryCount < 5 && tx.Status == model.StatusConfirming {
+			log.Printf("%v", tx.RetryCount)
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			if err := s.repo.AddRetryCount(ctx, tx.XID); err != nil {
+				log.Printf("[scanner] AddRetryCount failed: %v", err)
+			}
 			if err := s.recoverer.Recover(ctx, tx); err != nil {
 				log.Printf("[scanner] Recover failed for tx %s: %v", tx.XID, err)
 			}

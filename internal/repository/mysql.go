@@ -386,7 +386,15 @@ func (r *MySQLRepository) ClearAllTransactions(ctx context.Context) error {
 	}
 	_, err = r.db.ExecContext(ctx, "DELETE FROM branch_transaction WHERE true")
 	if err != nil {
-		return fmt.Errorf("clear all transactions: %w", err)
+		return fmt.Errorf("clear all branch transactions: %w", err)
+	}
+	return nil
+}
+
+func (r *MySQLRepository) AddRetryCount(ctx context.Context, id string) error {
+	_, err := r.db.ExecContext(ctx, "UPDATE global_transaction SET retry_count = retry_count + 1 WHERE xid=?", id)
+	if err != nil {
+		return fmt.Errorf("add retry count: %w", err)
 	}
 	return nil
 }

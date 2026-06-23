@@ -66,6 +66,7 @@ func (s *Server) Confirm(ctx context.Context, req *pb.ConfirmRequest) (*pb.Confi
 	//time.Sleep(time.Duration(50+rand.Intn(100)) * time.Millisecond)
 
 	s.states[req.Xid] = "confirmed"
+	//return &pb.ConfirmResponse{Success: false}, nil,测试重试机制用
 	return &pb.ConfirmResponse{Success: true}, nil
 }
 

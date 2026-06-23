@@ -119,7 +119,6 @@ func (s *GRPCServer) Commit(ctx context.Context, req *coordpb.CommitRequest) (*c
 				log.Printf("[coordinator] Confirm branch %s failed: %v", br.ServiceName, err)
 				tx.UpdateTime = time.Now()
 				s.store.Update(tx)
-				tx.Status = model.StatusFailed
 				return &coordpb.CommitResponse{Success: false, Error: fmt.Sprintf("confirm %s failed: %v", br.ServiceName, err)}, nil
 			}
 			br.Status = model.BranchConfirmDone

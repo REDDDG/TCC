@@ -119,7 +119,7 @@ func (r *DefaultRecoverer) Recover(ctx context.Context, tx *model.Transaction) e
 	for _, br := range fullTx.Branches {
 		if br.Status != model.BranchConfirmDone {
 			if err := r.callBranchConfirm(ctx, br, fullTx.XID, br.Address); err != nil {
-				log.Printf("[recoverer] cancel branch %s (id=%d) failed: %v", br.ServiceName, br.BranchID, err)
+				log.Printf("[recoverer] recover branch %s (id=%d) failed: %v", br.ServiceName, br.BranchID, err)
 				lastErr = err
 			} else {
 				if err := r.repo.UpdateBranchStatus(ctx, br.BranchID, model.BranchConfirmDone); err != nil {
@@ -127,9 +127,9 @@ func (r *DefaultRecoverer) Recover(ctx context.Context, tx *model.Transaction) e
 				}
 			}
 		}
-		if err := r.repo.UpdateTransactionStatus(ctx, fullTx.XID, model.StatusCompleted); err != nil {
-			return fmt.Errorf("recover: update tx status to Failed: %w", err)
-		}
+	}
+	if err := r.repo.UpdateTransactionStatus(ctx, fullTx.XID, model.StatusCompleted); err != nil {
+		return fmt.Errorf("recover: update tx status to Failed: %w", err)
 	}
 	if lastErr != nil {
 		return fmt.Errorf("recover %s partially failed: %w", fullTx.XID, lastErr)
