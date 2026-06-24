@@ -6,8 +6,8 @@ import (
 )
 
 // InventoryTry Inventory的Try尝试
-func (r *MySQLRepository) InventoryTry(ctx context.Context, branchId string) error {
-	cnt, err := r.db.ExecContext(ctx, "UPDATE inventory_stock SET total =total- 1 where product_id=? AND total>=1", branchId)
+func (r *MySQLRepository) InventoryTry(ctx context.Context, productId string) error {
+	cnt, err := r.db.ExecContext(ctx, "UPDATE inventory_stock SET total =total- 1 where product_id=? AND total>=1", productId)
 	if err != nil {
 		return err
 	}
@@ -17,8 +17,8 @@ func (r *MySQLRepository) InventoryTry(ctx context.Context, branchId string) err
 	}
 	return fmt.Errorf("inventory try %d failed", nums)
 }
-func (r *MySQLRepository) InventoryCancel(ctx context.Context, branchId string) error {
-	_, err := r.db.ExecContext(ctx, "UPDATE inventory_stock SET total=total+ 1 where product_id=?", branchId)
+func (r *MySQLRepository) InventoryCancel(ctx context.Context, productId string) error {
+	_, err := r.db.ExecContext(ctx, "UPDATE inventory_stock SET total=total+ 1 where product_id=?", productId)
 	if err != nil {
 		return err
 	}
