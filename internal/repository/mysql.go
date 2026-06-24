@@ -398,3 +398,35 @@ func (r *MySQLRepository) AddRetryCount(ctx context.Context, id string) error {
 	}
 	return nil
 }
+
+func (r *MySQLRepository) GetBranchTransaction(ctx context.Context, id string) (model.BranchStatus, error) {
+	rows, err := r.db.QueryContext(ctx, "SELECT status FROM branch_transaction WHERE branch_id=?", id)
+	if err != nil {
+		return "", fmt.Errorf("GetBranchTransaction: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var status int
+		if err := rows.Scan(&status); err != nil {
+			return "", fmt.Errorf("GetBranchTransaction: %w", err)
+		}
+		return intToBranchStatus[status], nil
+	}
+	return "", nil
+}
+
+func (r *MySQLRepository) UpdateBranchTransaction(ctx context.Context, id string, status model.BranchStatus) error {
+	rows, err := r.db.ExecContext(ctx, "UPDATE global_transaction SET status=? WHERE xid=?", branchStatusToInt[status], id)
+	if err != nil {
+		return fmt.Errorf("UpdateBranchTransaction: %w", err)
+	}
+	count, err := rows.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("UpdateBranchTransaction: %w", err)
+	}
+	if count == 0 {
+		return fmt.Errorf("UpdateError: branch transaction not found")
+	}
+	return nil
+
+}

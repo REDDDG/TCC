@@ -16,6 +16,11 @@ type Repository interface {
 	// 未找到时返回 nil, nil。
 	GetTransaction(ctx context.Context, xid string) (*model.Transaction, error)
 
+	// GetBranchTransaction 按id查询分支事务
+	GetBranchTransaction(ctx context.Context, id string) (model.BranchStatus, error)
+
+	UpdateBranchTransaction(ctx context.Context, id string, status model.BranchStatus) error
+
 	// UpdateTransactionStatus 只更新全局事务的状态字段和更新时间。
 	UpdateTransactionStatus(ctx context.Context, xid string, status model.TxStatus) error
 
@@ -34,4 +39,10 @@ type Repository interface {
 
 	// AddRetryCount 重试计数+1
 	AddRetryCount(ctx context.Context, id string) error
+
+	// InventoryTry 尝试购买
+	InventoryTry(ctx context.Context, branchId string) error
+
+	// InventoryCancel 取消购买
+	InventoryCancel(ctx context.Context, branchId string) error
 }

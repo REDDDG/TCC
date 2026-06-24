@@ -1,6 +1,6 @@
-// Package branch 提供 TCC 分支服务的模拟实现，用于本地开发和测试。
+// Package order 提供 TCC 分支服务的模拟实现，用于本地开发和测试。
 // 三个服务 (Order/Inventory/Points) 共用此实现，通过 ServiceName 区分。
-package branch
+package order
 
 import (
 	"context"
@@ -8,28 +8,27 @@ import (
 	"math/rand"
 	"sync"
 	pb "tcc/api/proto/branch"
+	"tcc/internal/repository"
 )
 
 // Server 实现 BranchServiceServer 接口，模拟一个 TCC 分支服务。
 // Phase 1 为单节点 MVP：纯内存状态，随机延迟，90% Try 成功率。
 type Server struct {
+	pb.UnimplementedBranchServiceServer
 	ServiceName string
 	mu          sync.Mutex
 	states      map[string]string // xid -> 本地状态: "try_ok" | "confirmed" | "cancelled"
+	repo        repository.Repository
 }
 
 // NewServer 创建一个分支服务实例。
 //   - name: 服务名称，用于日志和错误消息中标识自身
-func NewServer(name string) *Server {
+func NewServer(name string, repo repository.Repository) *Server {
 	return &Server{
 		ServiceName: name,
 		states:      make(map[string]string),
+		repo:        repo,
 	}
-}
-
-func IsCancelled(m map[string]string, xid string) bool {
-	st, ok := m[xid]
-	return ok && st == "cancelled"
 }
 
 // Try 实现 TCC 的 Try 阶段：尝试预留资源。
@@ -40,8 +39,9 @@ func IsCancelled(m map[string]string, xid string) bool {
 func (s *Server) Try(ctx context.Context, req *pb.TryRequest) (*pb.TryResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	st, ok := s.states[req.Xid]
 	// 空回滚检测：Cancel 先于 Try 到达，直接拒绝防止悬挂资源
-	if st, ok := s.states[req.Xid]; ok && st == "cancelled" {
+	if ok && st == "cancelled" {
 		return &pb.TryResponse{Success: false, Error: "cancelled before try"}, nil
 	}
 
@@ -52,7 +52,6 @@ func (s *Server) Try(ctx context.Context, req *pb.TryRequest) (*pb.TryResponse, 
 	if rand.Intn(10) < 1 {
 		return &pb.TryResponse{Success: false, Error: fmt.Sprintf("%s: resource occupied", s.ServiceName)}, nil
 	}
-
 	s.states[req.Xid] = "try_ok"
 	return &pb.TryResponse{Success: true}, nil
 }
