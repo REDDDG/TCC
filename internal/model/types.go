@@ -53,6 +53,34 @@ type Transaction struct {
 	UpdateTime time.Time            `json:"update_time"` // 最后一次状态变更时间
 }
 
+// Inventory 商品库存
+type Inventory struct {
+	ProductID string    `json:"product_id"`
+	Toral     int       `json:"toral"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// Order 表示订单
+type Order struct {
+	XID        string    `json:"xid"`
+	UserID     string    `json:"user_id"`
+	ProductID  string    `json:"product_id"`
+	Quantity   int       `json:"quantity"`
+	Amount     float64   `json:"amount"`
+	Status     int       `json:"status"`
+	CreateTime time.Time `json:"create_time"`
+	UpdateTime time.Time `json:"update_time"`
+}
+
+// PointsAccount 表示积分
+type PointsAccount struct {
+	UserID    string    `json:"user_id"`
+	Balance   int       `json:"balance"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 // NewTransaction 创建一个新的全局事务，初始状态为 StatusTrying。
 //   - xid: 全局事务唯一标识，由调用方生成（UUID）
 //   - branches: 预初始化的分支事务列表，每个分支状态为 BranchInit
