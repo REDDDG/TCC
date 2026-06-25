@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"tcc/internal/myTime"
 	"time"
 
 	"tcc/internal/model"
@@ -65,7 +66,7 @@ func NewMySQLRepository(dsn string) (*MySQLRepository, error) {
 	db.SetMaxIdleConns(10)
 	db.SetConnMaxLifetime(5 * time.Minute)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*myTime.MyTime)
 	defer cancel()
 	if err := db.PingContext(ctx); err != nil {
 		db.Close()

@@ -6,6 +6,7 @@ import (
 	"context"
 	"log"
 	"sync"
+	"tcc/internal/myTime"
 	"time"
 
 	"tcc/internal/model"
@@ -41,7 +42,7 @@ func NewStore(repo repository.Repository) *Store {
 // 意义：每个 DB 操作独立 3 秒超时。即使上游 gRPC handler 的 context
 // 已被取消（例如客户端断开），写操作仍有机会完成——这对事务一致性至关重要。
 func dbCtx() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), 3*time.Second)
+	return context.WithTimeout(context.Background(), 3*myTime.MyTime)
 }
 
 // Create 写入一个新事务：先持久化到 MySQL（含所有分支），再缓存到内存。

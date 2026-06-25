@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"log"
 	"sync"
-	"time"
-
 	branchpb "tcc/api/proto/branch"
 	"tcc/internal/model"
+	"tcc/internal/myTime"
 	"tcc/internal/repository"
 
 	"google.golang.org/grpc"
@@ -149,7 +148,7 @@ func (r *DefaultRecoverer) callBranchCancel(ctx context.Context, br *model.Branc
 		return fmt.Errorf("getBranchClient %s: %w", addr, err)
 	}
 
-	callCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	callCtx, cancel := context.WithTimeout(ctx, 3*myTime.MyTime)
 	defer cancel()
 
 	resp, err := client.Cancel(callCtx, &branchpb.CancelRequest{BranchId: br.BranchID})
@@ -173,7 +172,7 @@ func (r *DefaultRecoverer) callBranchConfirm(ctx context.Context, br *model.Bran
 		return fmt.Errorf("getBranchClient %s: %w", addr, err)
 	}
 
-	callCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	callCtx, cancel := context.WithTimeout(ctx, 3*myTime.MyTime)
 	defer cancel()
 
 	resp, err := client.Confirm(callCtx, &branchpb.ConfirmRequest{BranchId: br.BranchID})

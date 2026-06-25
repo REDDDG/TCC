@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"tcc/internal/myTime"
 	"time"
 
 	coordpb "tcc/api/proto/coordinator"
@@ -52,7 +53,7 @@ func (h *GinHandler) CreateTransaction(c *gin.Context) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*myTime.MyTime)
 	defer cancel()
 
 	participants := make([]*coordpb.Participant, len(req.Participants))
@@ -105,7 +106,7 @@ func (h *GinHandler) ListTransactions(c *gin.Context) {
 func (h *GinHandler) GetTransaction(c *gin.Context) {
 	xid := c.Param("xid")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*myTime.MyTime)
 	defer cancel()
 
 	resp, err := h.client.GetStatus(ctx, &coordpb.StatusRequest{Xid: xid})

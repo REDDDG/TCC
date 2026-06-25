@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"tcc/internal/model"
+	"tcc/internal/myTime"
 	"time"
 
 	"tcc/internal/repository"
@@ -28,7 +29,7 @@ type TimeoutScanner struct {
 //	interval:  扫描间隔，若 <= 0 则默认 10 秒
 func NewTimeoutScanner(repo repository.Repository, recoverer Recoverer, interval time.Duration) *TimeoutScanner {
 	if interval <= 0 {
-		interval = 10 * time.Second
+		interval = 10 * myTime.MyTime
 	}
 	return &TimeoutScanner{
 		repo:      repo,
@@ -80,7 +81,7 @@ func (s *TimeoutScanner) scanOnce() {
 		// 每个事务用独立 context 防止级联超时
 		if tx.RetryCount < 5 && tx.Status == model.StatusConfirming {
 			log.Printf("%v", tx.RetryCount)
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*myTime.MyTime)
 			if err := s.repo.AddRetryCount(ctx, tx.XID); err != nil {
 				log.Printf("[scanner] AddRetryCount failed: %v", err)
 			}
@@ -89,7 +90,7 @@ func (s *TimeoutScanner) scanOnce() {
 			}
 			cancel()
 		} else {
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*myTime.MyTime)
 			if err := s.recoverer.Cancel(ctx, tx); err != nil {
 				log.Printf("[scanner] cancel XID=%s failed: %v", tx.XID, err)
 			}

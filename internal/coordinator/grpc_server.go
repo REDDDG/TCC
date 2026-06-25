@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"sync"
+	"tcc/internal/myTime"
 	"time"
 
 	branchpb "tcc/api/proto/branch"
@@ -205,7 +206,7 @@ func (s *GRPCServer) callBranchTry(br *model.BranchTransaction, xid, resourceDat
 	if err != nil {
 		return fmt.Errorf("getBranchClient %s: %w", addr, err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*myTime.MyTime)
 	defer cancel()
 	start := time.Now()
 	resp, err := client.Try(ctx, &branchpb.TryRequest{BranchId: br.BranchID, ResourceData: resourceData})
@@ -229,7 +230,7 @@ func (s *GRPCServer) callBranchConfirm(br *model.BranchTransaction, xid, addr st
 	if err != nil {
 		return fmt.Errorf("dial %s: %w", addr, err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*myTime.MyTime)
 	defer cancel()
 
 	resp, err := client.Confirm(ctx, &branchpb.ConfirmRequest{BranchId: br.BranchID, ResourceData: br.ResourceData})
@@ -252,7 +253,7 @@ func (s *GRPCServer) callBranchCancel(br *model.BranchTransaction, xid, addr str
 	if err != nil {
 		return fmt.Errorf("dial %s: %w", addr, err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*myTime.MyTime)
 	defer cancel()
 
 	resp, err := client.Cancel(ctx, &branchpb.CancelRequest{BranchId: br.BranchID, ResourceData: br.ResourceData})

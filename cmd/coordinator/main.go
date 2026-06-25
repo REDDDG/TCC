@@ -11,11 +11,10 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
-
 	coordpb "tcc/api/proto/coordinator"
 	"tcc/internal/coordinator"
 	"tcc/internal/middleware"
+	"tcc/internal/myTime"
 	"tcc/internal/recoverer"
 	"tcc/internal/repository"
 
@@ -66,7 +65,7 @@ func main() {
 	scannerCancel := func() {} // 默认空操作，MySQL 不可用时无 scanner 需停止
 	if repo != nil {
 		rec := recoverer.NewDefaultRecoverer(repo)
-		scanner := recoverer.NewTimeoutScanner(repo, rec, 10*time.Second)
+		scanner := recoverer.NewTimeoutScanner(repo, rec, 10*myTime.MyTime)
 
 		var scannerCtx context.Context
 		scannerCtx, scannerCancel = context.WithCancel(context.Background())
