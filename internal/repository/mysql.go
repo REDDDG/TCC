@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -160,7 +161,7 @@ func (r *MySQLRepository) GetTransaction(ctx context.Context, xid string) (*mode
 		retryCount int
 	)
 	if err := row.Scan(&xid, &statusInt, &svcName, &createTime, &updateTime, &timeout, &retryCount); err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("get global: %w", err)
@@ -399,7 +400,7 @@ func (r *MySQLRepository) AddRetryCount(ctx context.Context, id string) error {
 	return nil
 }
 
-func (r *MySQLRepository) GetBranchTransaction(ctx context.Context, id string) (model.BranchStatus, error) {
+func (r *MySQLRepository) GetBranchTransaction(ctx context.Context, id int64) (model.BranchStatus, error) {
 	rows, err := r.db.QueryContext(ctx, "SELECT status FROM branch_transaction WHERE branch_id=?", id)
 	if err != nil {
 		return "", fmt.Errorf("GetBranchTransaction: %w", err)
@@ -415,8 +416,8 @@ func (r *MySQLRepository) GetBranchTransaction(ctx context.Context, id string) (
 	return "", nil
 }
 
-func (r *MySQLRepository) UpdateBranchTransaction(ctx context.Context, id string, status model.BranchStatus) error {
-	rows, err := r.db.ExecContext(ctx, "UPDATE global_transaction SET status=? WHERE xid=?", branchStatusToInt[status], id)
+func (r *MySQLRepository) UpdateBranchTransaction(ctx context.Context, id int64, status model.BranchStatus) error {
+	rows, err := r.db.ExecContext(ctx, "UPDATE branch_transaction SET status=? WHERE xid=?", branchStatusToInt[status], id)
 	if err != nil {
 		return fmt.Errorf("UpdateBranchTransaction: %w", err)
 	}

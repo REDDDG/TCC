@@ -152,7 +152,7 @@ func (r *DefaultRecoverer) callBranchCancel(ctx context.Context, br *model.Branc
 	callCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
-	resp, err := client.Cancel(callCtx, &branchpb.CancelRequest{Xid: xid})
+	resp, err := client.Cancel(callCtx, &branchpb.CancelRequest{BranchId: br.BranchID})
 	if err != nil {
 		return fmt.Errorf("cancel rpc: %w", err)
 	}
@@ -176,7 +176,7 @@ func (r *DefaultRecoverer) callBranchConfirm(ctx context.Context, br *model.Bran
 	callCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
 
-	resp, err := client.Confirm(callCtx, &branchpb.ConfirmRequest{Xid: xid})
+	resp, err := client.Confirm(callCtx, &branchpb.ConfirmRequest{BranchId: br.BranchID})
 	if err != nil {
 		return fmt.Errorf("ConfirmRequest rpc: %w", err)
 	}

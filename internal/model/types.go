@@ -63,7 +63,7 @@ type Inventory struct {
 
 // Order 表示订单
 type Order struct {
-	XID        string    `json:"xid"`
+	Id         int64     `json:"id"`
 	UserID     string    `json:"user_id"`
 	ProductID  string    `json:"product_id"`
 	Quantity   int       `json:"quantity"`

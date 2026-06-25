@@ -17,9 +17,9 @@ type Repository interface {
 	GetTransaction(ctx context.Context, xid string) (*model.Transaction, error)
 
 	// GetBranchTransaction 按id查询分支事务
-	GetBranchTransaction(ctx context.Context, id string) (model.BranchStatus, error)
+	GetBranchTransaction(ctx context.Context, id int64) (model.BranchStatus, error)
 
-	UpdateBranchTransaction(ctx context.Context, id string, status model.BranchStatus) error
+	UpdateBranchTransaction(ctx context.Context, id int64, status model.BranchStatus) error
 
 	// UpdateTransactionStatus 只更新全局事务的状态字段和更新时间。
 	UpdateTransactionStatus(ctx context.Context, xid string, status model.TxStatus) error
