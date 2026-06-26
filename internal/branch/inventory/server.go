@@ -4,7 +4,6 @@ package inventory
 
 import (
 	"context"
-	"sync"
 	pb "tcc/api/proto/branch"
 	"tcc/internal/model"
 	"tcc/internal/repository"
@@ -14,7 +13,6 @@ import (
 type Server struct {
 	pb.UnimplementedBranchServiceServer
 	ServiceName string
-	mu          sync.Mutex
 	repo        repository.Repository
 }
 
@@ -29,8 +27,6 @@ func NewServer(name string, repo repository.Repository) *Server {
 
 // Try 实现 TCC 的 Try 阶段：尝试预留资源。
 func (s *Server) Try(ctx context.Context, req *pb.TryRequest) (*pb.TryResponse, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	st, err := s.repo.GetBranchTransaction(ctx, req.BranchId)
 	if err != nil {
 		return &pb.TryResponse{Success: false, Error: "StatusError"}, err
@@ -43,10 +39,6 @@ func (s *Server) Try(ctx context.Context, req *pb.TryRequest) (*pb.TryResponse, 
 		return &pb.TryResponse{Success: false, Error: "TryError"}, err
 	}
 
-	//if rand.Intn(10) < 1 {
-	//	return &pb.TryResponse{Success: false, Error: fmt.Sprintf("%s: resource occupied", s.ServiceName)}, nil
-	//}
-
 	if err := s.repo.UpdateBranchTransaction(ctx, req.BranchId, model.BranchTryDone); err != nil {
 		return nil, err
 	}
@@ -55,9 +47,6 @@ func (s *Server) Try(ctx context.Context, req *pb.TryRequest) (*pb.TryResponse, 
 
 // Confirm 实现 TCC 的 Confirm 阶段：确认提交已预留的资源。
 func (s *Server) Confirm(ctx context.Context, req *pb.ConfirmRequest) (*pb.ConfirmResponse, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	if err := s.repo.InventoryConfirm(ctx, req.ResourceData); err != nil {
 		return &pb.ConfirmResponse{Success: false, Error: "ConfirmError"}, err
 	}
@@ -70,9 +59,6 @@ func (s *Server) Confirm(ctx context.Context, req *pb.ConfirmRequest) (*pb.Confi
 
 // Cancel 实现 TCC 的 Cancel 阶段：回滚已预留的资源。
 func (s *Server) Cancel(ctx context.Context, req *pb.CancelRequest) (*pb.CancelResponse, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	if err := s.repo.InventoryCancel(ctx, req.ResourceData); err != nil {
 		return &pb.CancelResponse{Success: false}, err
 	}

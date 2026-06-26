@@ -418,7 +418,7 @@ func (r *MySQLRepository) GetBranchTransaction(ctx context.Context, id int64) (m
 }
 
 func (r *MySQLRepository) UpdateBranchTransaction(ctx context.Context, id int64, status model.BranchStatus) error {
-	rows, err := r.db.ExecContext(ctx, "UPDATE branch_transaction SET status=? WHERE xid=?", branchStatusToInt[status], id)
+	rows, err := r.db.ExecContext(ctx, "UPDATE branch_transaction SET status=? WHERE branch_id=?", branchStatusToInt[status], id)
 	if err != nil {
 		return fmt.Errorf("UpdateBranchTransaction: %w", err)
 	}

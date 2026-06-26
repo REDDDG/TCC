@@ -57,7 +57,6 @@ func main() {
 			log.Fatalf("gRPC server failed: %v", err)
 		}
 	}()
-
 	// ── 超时恢复器 ──
 	// Scanner 定时（默认 10s）扫描 MySQL 中已超时的非终态事务，
 	// 交给 Recoverer 执行补偿 Cancel，避免资源永久悬挂。

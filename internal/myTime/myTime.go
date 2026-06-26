@@ -2,4 +2,4 @@ package myTime
 
 import "time"
 
-const MyTime = time.Hour
+const MyTime = time.Second
