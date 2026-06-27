@@ -40,6 +40,7 @@ func NewGinHandler(coordAddr string, store *Store) *GinHandler {
 //   - c: Gin 上下文，请求体含 participants 数组和可选的 timeout
 //   - 返回: JSON 格式的 BeginResponse（含 xid、success、branch_results）
 func (h *GinHandler) CreateTransaction(c *gin.Context) {
+	start := time.Now()
 	var req struct {
 		Participants []struct {
 			ServiceName  string `json:"service_name"`
@@ -72,7 +73,7 @@ func (h *GinHandler) CreateTransaction(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, resp)
+	c.JSON(http.StatusOK, gin.H{"response": resp, "time": time.Since(start)})
 }
 
 // ListTransactions 处理 GET /api/v1/transactions

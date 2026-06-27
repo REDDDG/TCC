@@ -56,7 +56,7 @@ type Transaction struct {
 // Inventory 商品库存
 type Inventory struct {
 	ProductID string    `json:"product_id"`
-	Toral     int       `json:"toral"`
+	Total     int       `json:"total"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
