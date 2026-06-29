@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TCC Coordinator — Phase 1</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #f0f2f5;
+            color: #1a1a2e;
+            padding: 24px;
+        }
+        .container {
+            max-width: 960px;
+            margin: 0 auto;
+        }
+        h1 {
+            font-size: 22px;
+            margin-bottom: 20px;
+            color: #0b3b5f;
+        }
+        .card {
+            background: #fff;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        }
+        .card h2 {
+            font-size: 16px;
+            margin-bottom: 12px;
+            color: #2c6e9e;
+        }
+        label {
+            font-size: 13px;
+            font-weight: 600;
+        }
+        input,
+        select,
+        button {
+            padding: 8px 12px;
+            border: 1px solid #d0d5dd;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+        button {
+            background: #2c6e9e;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        button:hover {
+            background: #1b5270;
+        }
+        button:disabled {
+            background: #a0b4c4;
+            cursor: not-allowed;
+        }
+        .btn-danger {
+            background: #dc3545;
+        }
+        .btn-danger:hover {
+            background: #b02a37;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        th,
+        td {
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 1px solid #e9ecef;
+        }
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+        }
+        .badge {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .badge-Trying {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .badge-Confirming {
+            background: #cce5ff;
+            color: #004085;
+        }
+        .badge-Cancelling {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .badge-Completed {
+            background: #d4edda;
+            color: #155724;
+        }
+        .badge-Failed {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .badge-NOT_FOUND {
+            background: #e9ecef;
+            color: #6c757d;
+        }
+        .branch-list {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .branch-tag {
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            background: #e9ecef;
+        }
+        .health-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: #6c757d;
+        }
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #28a745;
+        }
+        .resource-rows {
+            margin-bottom: 8px;
+        }
+        .resource-group {
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+        }
+        .resource-group h3 {
+            font-size: 13px;
+            margin-bottom: 8px;
+            color: #2c6e9e;
+        }
+        .resource-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+        .resource-row label {
+            font-size: 12px;
+            font-weight: 600;
+            min-width: 70px;
+            color: #555;
+        }
+        .resource-row input {
+            flex: 1;
+        }
+        .toolbar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>TCC 分布式事务协调器 — Phase 1 MVP</h1>
+
+    <div class="card">
+        <div class="health-bar">
+            <span class="dot" id="healthDot"></span>
+            <span id="healthText">检查中...</span>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>新建事务</h2>
+        <div class="resource-rows">
+            <div class="resource-group">
+                <h3>Order Service (:8081)</h3>
+                <div class="resource-row">
+                    <label>UserID</label>
+                    <input type="text" id="orderUserId" value="1" placeholder="用户ID" />
+                </div>
+                <div class="resource-row">
+                    <label>ProductID</label>
+                    <input type="text" id="orderProductId" value="1" placeholder="商品ID" />
+                </div>
+                <div class="resource-row">
+                    <label>Quantity</label>
+                    <input type="number" id="orderQuantity" value="2" placeholder="数量" />
+                </div>
+                <div class="resource-row">
+                    <label>Amount</label>
+                    <input type="number" id="orderAmount" value="99.90" step="0.01" placeholder="金额" />
+                </div>
+            </div>
+            <div class="resource-group">
+                <h3>Inventory Service (:8082)</h3>
+                <div class="resource-row">
+                    <label>ProductID</label>
+                    <input type="text" id="inventoryProductId" value="1" placeholder="商品ID" />
+                </div>
+            </div>
+            <div class="resource-group">
+                <h3>Points Service (:8083)</h3>
+                <div class="resource-row">
+                    <label>UserID</label>
+                    <input type="text" id="pointsUserId" value="1" placeholder="用户ID" />
+                </div>
+            </div>
+        </div>
+        <button onclick="beginTransaction()">发起事务 (Begin)</button>
+        <p id="beginResult" style="margin-top:10px;font-size:12px;"></p>
+    </div>
+
+    <div class="card">
+        <h2>事务列表</h2>
+        <div class="toolbar">
+            <button onclick="refreshList()">刷新</button>
+            <button onclick="clearAllTransactions()" class="btn-danger">清空所有</button>
+        </div>
+        <table>
+            <thead>
+            <tr>
+                <th>XID</th>
+                <th>状态</th>
+                <th>分支</th>
+                <th>时间</th>
+                <th>操作</th>
+            </tr>
+            </thead>
+            <tbody id="txTableBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const API = '/api/v1';
+
+    // ---------- 格式化耗时：纳秒 → 可读文字 ----------
+    function formatDuration(ns) {
+        if (typeof ns === 'string') ns = parseInt(ns, 10);
+        if (isNaN(ns) || ns < 0) return String(ns);
+
+        const seconds = Math.floor(ns / 1_000_000_000);
+        const ms = Math.floor((ns % 1_000_000_000) / 1_000_000);
+        const us = Math.floor((ns % 1_000_000) / 1_000);
+        const nanos = ns % 1_000;
+
+        const parts = [];
+        if (seconds > 0) parts.push(seconds + '秒');
+        if (ms > 0) parts.push(ms + '毫秒');
+        if (us > 0) parts.push(us + '微秒');
+        if (nanos > 0) parts.push(nanos + '纳秒');
+        if (parts.length === 0) return '0纳秒';
+        return parts.join('');
+    }
+
+    // -------------------- 健康检查 --------------------
+    async function checkHealth() {
+        try {
+            const r = await fetch(API + '/health');
+            const d = await r.json();
+            document.getElementById('healthText').textContent = `角色: ${d.role} | 状态: ${d.status} | ${d.time}`;
+            document.getElementById('healthDot').style.background = '#28a745';
+        } catch (e) {
+            document.getElementById('healthText').textContent = '连接失败';
+            document.getElementById('healthDot').style.background = '#dc3545';
+        }
+    }
+
+    // -------------------- 发起事务 --------------------
+    async function beginTransaction() {
+        const btn = document.querySelector('button[onclick="beginTransaction()"]');
+        btn.disabled = true;
+
+        // 读取表单数值
+        const quantity = parseInt(document.getElementById('orderQuantity').value) || 0;
+        const amount = parseFloat(document.getElementById('orderAmount').value) || 0;
+        const pointsValue = Math.round(amount * 100);   // 金额*100转为整数积分
+
+        const orderData = JSON.stringify({
+            user_id: document.getElementById('orderUserId').value,
+            product_id: document.getElementById('orderProductId').value,
+            quantity: quantity,
+            amount: amount
+        });
+        const inventoryData = document.getElementById('inventoryProductId').value;
+        const pointsData = JSON.stringify({
+            user_id: document.getElementById('pointsUserId').value
+        });
+
+        // 构建 participants，为 Inventory 和 Points 添加 value 字段（int64）
+        const participants = [
+            { service_name: 'OrderService', resource_data: orderData, address: '127.0.0.1:8081' },
+            { service_name: 'InventoryService', resource_data: inventoryData, address: '127.0.0.1:8082', value: quantity },
+            { service_name: 'PointsService', resource_data: pointsData, address: '127.0.0.1:8083', value: pointsValue }
+        ];
+
+        try {
+            // 过滤掉 resource_data 为空的参与者（例如未填写 productId 的 inventory）
+            const active = participants.filter(p => p.resource_data.trim() !== '');
+            const r = await fetch(API + '/transactions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ participants: active, timeout: 30 })
+            });
+            const data = await r.json();
+            const d = data.response;
+            const elapsedNs = data.time;
+            const readableTime = formatDuration(elapsedNs);
+
+            const el = document.getElementById('beginResult');
+            if (d.success) {
+                el.innerHTML = `<span style="color:green">&#10003; 事务创建成功！XID: <b>${d.xid}</b>，耗时: ${readableTime}</span>`;
+            } else {
+                const failed = (d.branch_results || []).filter(b => !b.success).map(b => b.service_name).join(', ');
+                el.innerHTML = `<span style="color:red">&#10007; Try 失败: [${failed}] — 已自动回滚，耗时: ${readableTime}</span>`;
+            }
+            refreshList();
+        } catch (e) {
+            document.getElementById('beginResult').innerHTML = `<span style="color:red">请求失败: ${e.message}</span>`;
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    // -------------------- 查询事务详情 --------------------
+    async function getTransaction(xid) {
+        try {
+            const r = await fetch(`${API}/transactions/${xid}`);
+            const d = await r.json();
+            const branches = (d.branch_statuses || []).map(b => `${b.service_name}:${b.status}`).join(', ');
+            alert(`XID: ${d.xid}\n状态: ${d.status}\n分支: ${branches}`);
+        } catch (e) {
+            alert(`查询失败: ${e.message}`);
+        }
+    }
+
+    // -------------------- 刷新列表 --------------------
+    async function refreshList() {
+        const tbody = document.getElementById('txTableBody');
+        try {
+            const r = await fetch(`${API}/transactions`);
+            const txs = await r.json();
+
+            if (!Array.isArray(txs) || txs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#999">暂无事务，请先发起</td></tr>';
+                return;
+            }
+
+            const rows = [];
+            for (const tx of txs) {
+                let branchesHTML = '...';
+                try {
+                    const dr = await fetch(`${API}/transactions/${tx.xid}`);
+                    const detail = await dr.json();
+                    branchesHTML = (detail.branch_statuses || []).map(b =>
+                        `<span class="branch-tag">${b.service_name}: ${b.status}</span>`
+                    ).join('');
+                } catch (e) {}
+
+                const actions = `<button onclick="getTransaction('${tx.xid}')" style="font-size:11px;padding:4px 8px;background:#6c757d">详情</button>`;
+
+                rows.push(`<tr>
+                        <td style="font-family:monospace;font-size:12px">${tx.xid ? tx.xid.substring(0,8)+'...' : '?'}</td>
+                        <td><span class="badge badge-${tx.status}">${tx.status}</span></td>
+                        <td><div class="branch-list">${branchesHTML}</div></td>
+                        <td style="font-size:11px">${tx.create_time || ''}</td>
+                        <td>${actions}</td>
+                    </tr>`);
+            }
+            tbody.innerHTML = rows.join('');
+        } catch (e) {
+            tbody.innerHTML = '<tr><td colspan="5" style="color:#999">加载失败，请重试</td></tr>';
+        }
+    }
+
+    // -------------------- 清空所有事务 --------------------
+    async function clearAllTransactions() {
+        if (!confirm('⚠️ 确定要清空所有事务吗？此操作不可撤销！')) {
+            return;
+        }
+
+        try {
+            const r = await fetch(API + '/clear', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (r.ok) {
+                alert(`✅ 已清空所有事务`);
+                await refreshList();
+            }
+            else {
+                alert('未知错误？');
+            }
+        } catch (e) {
+            alert(`❌ 请求失败: ${e.message}`);
+        }
+    }
+
+    // -------------------- 定时任务 --------------------
+    checkHealth();
+    setInterval(checkHealth, 10000);
+    refreshList();
+</script>
+</body>
+</html>
