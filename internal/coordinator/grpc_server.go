@@ -209,7 +209,7 @@ func (s *GRPCServer) callBranchTry(br *model.BranchTransaction, xid, resourceDat
 	ctx, cancel := context.WithTimeout(context.Background(), 3*myTime.MyTime)
 	defer cancel()
 	start := time.Now()
-	resp, err := client.Try(ctx, &branchpb.TryRequest{BranchId: br.BranchID, ResourceData: resourceData})
+	resp, err := client.Try(ctx, &branchpb.TryRequest{BranchId: br.BranchID, ResourceData: resourceData, Xid: xid})
 	fmt.Println("clientCallBranchTry:", time.Since(start))
 	if err != nil {
 		return fmt.Errorf("try rpc: %w", err)
@@ -233,7 +233,7 @@ func (s *GRPCServer) callBranchConfirm(br *model.BranchTransaction, xid, addr st
 	ctx, cancel := context.WithTimeout(context.Background(), 3*myTime.MyTime)
 	defer cancel()
 
-	resp, err := client.Confirm(ctx, &branchpb.ConfirmRequest{BranchId: br.BranchID, ResourceData: br.ResourceData})
+	resp, err := client.Confirm(ctx, &branchpb.ConfirmRequest{BranchId: br.BranchID, ResourceData: br.ResourceData, Xid: xid})
 	if err != nil {
 		return fmt.Errorf("confirm rpc: %w", err)
 	}
@@ -256,7 +256,7 @@ func (s *GRPCServer) callBranchCancel(br *model.BranchTransaction, xid, addr str
 	ctx, cancel := context.WithTimeout(context.Background(), 3*myTime.MyTime)
 	defer cancel()
 
-	resp, err := client.Cancel(ctx, &branchpb.CancelRequest{BranchId: br.BranchID, ResourceData: br.ResourceData})
+	resp, err := client.Cancel(ctx, &branchpb.CancelRequest{BranchId: br.BranchID, ResourceData: br.ResourceData, Xid: xid})
 	if err != nil {
 		return fmt.Errorf("cancel rpc: %w", err)
 	}

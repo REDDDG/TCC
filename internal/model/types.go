@@ -40,6 +40,8 @@ type BranchTransaction struct {
 	ResourceData string       `json:"resource_data"`      // 预留资源描述
 	Status       BranchStatus `json:"status"`             // 当前分支状态
 	TryData      string       `json:"try_data,omitempty"` // Try 阶段返回的业务数据（预留）
+	CreateTime   time.Time    `json:"create_time"`        // 分支创建时间
+	UpdateTime   time.Time    `json:"update_time"`        // 最后更新时间
 }
 
 // Transaction 表示一次完整的全局 TCC 事务。

@@ -41,29 +41,29 @@ type Repository interface {
 	AddRetryCount(ctx context.Context, id string) error
 
 	// InventoryTry 尝试预留库存
-	InventoryTry(ctx context.Context, productId string) error
+	InventoryTry(ctx context.Context, branchId int64, xid string, productId string) error
 
 	// InventoryConfirm 确定更新库存，修改更新日期
-	InventoryConfirm(ctx context.Context, productId string) error
+	InventoryConfirm(ctx context.Context, branchId int64, xid string, productId string) error
 
 	// InventoryCancel 取消库存预留
-	InventoryCancel(ctx context.Context, productId string) error
+	InventoryCancel(ctx context.Context, branchId int64, xid string, productId string) error
 
 	// OrderTry 尝试创建订单
-	OrderTry(ctx context.Context, order model.Order) error
+	OrderTry(ctx context.Context, branchId int64, xid string, order model.Order) error
 
 	// OrderConfirm 更新订单修改日期
-	OrderConfirm(ctx context.Context, order model.Order) error
+	OrderConfirm(ctx context.Context, branchId int64, xid string, order model.Order) error
 
 	// OrderCancel 取消订单
-	OrderCancel(ctx context.Context, order model.Order) error
+	OrderCancel(ctx context.Context, branchId int64, xid string, order model.Order) error
 
 	// PointsTry 尝试扣减积分
-	PointsTry(ctx context.Context, account model.PointsAccount) error
+	PointsTry(ctx context.Context, branchId int64, xid string, account model.PointsAccount) error
 
 	// PointsConfirm 更新积分修改日期
-	PointsConfirm(ctx context.Context, account model.PointsAccount) error
+	PointsConfirm(ctx context.Context, branchId int64, xid string, account model.PointsAccount) error
 
 	// PointsCancel 取消积分扣减
-	PointsCancel(ctx context.Context, account model.PointsAccount) error
+	PointsCancel(ctx context.Context, branchId int64, xid string, account model.PointsAccount) error
 }

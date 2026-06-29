@@ -12,6 +12,7 @@ service BranchService {
 message TryRequest {
   int64 branch_id = 1;
   string resource_data = 2;
+  string xid = 3;
 }
 
 message TryResponse {
@@ -22,6 +23,7 @@ message TryResponse {
 message ConfirmRequest {
   int64 branch_id = 1;
   string resource_data = 2;
+  string xid = 3;
 }
 
 message ConfirmResponse {
@@ -32,6 +34,7 @@ message ConfirmResponse {
 message CancelRequest {
   int64 branch_id = 1;
   string resource_data = 2;
+  string xid = 3;
 }
 
 message CancelResponse {

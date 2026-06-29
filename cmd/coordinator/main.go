@@ -1,7 +1,8 @@
 // 协调器入口：启动 gRPC server (:9090) 和 Gin HTTP server (:8080)。
 // gRPC 负责 TCC 事务协议编排；Gin 提供前端页面和 REST API。
 //
-// Phase 2: 集成 MySQL 持久化、超时扫描器与恢复器。
+// 热路径走 Redis（事务 CRUD + 业务 Try/Confirm/Cancel），
+// 终态通过 Kafka 异步刷入 MySQL。
 package main
 
 import (
@@ -11,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+
 	coordpb "tcc/api/proto/coordinator"
 	"tcc/internal/coordinator"
 	"tcc/internal/middleware"
@@ -19,31 +21,52 @@ import (
 	"tcc/internal/repository"
 
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
 )
 
 func main() {
 	// ── MySQL 持久化层 ──
-	// 通过 MYSQL_DSN 环境变量配置；留空则退化为纯内存模式（Phase 1 兼容）。
 	dsn := os.Getenv("MYSQL_DSN")
 	if dsn == "" {
-		//仅在开发学习中直接写入密码
 		dsn = "root:mysql12138@tcp(127.0.0.1:3306)/tcc?parseTime=true"
 	}
 
-	var repo repository.Repository
 	mysqlRepo, err := repository.NewMySQLRepository(dsn)
 	if err != nil {
-		log.Printf("[main] MySQL not available (%v), falling back to in-memory mode", err)
-	} else {
-		repo = mysqlRepo
-		log.Println("[main] MySQL connected, tables ensured")
+		log.Fatalf("[main] MySQL not available: %v", err)
 	}
+	log.Println("[main] MySQL connected, tables ensured")
 
-	// ── 共享存储层（MySQL 持久化 + 内存缓存）──
+	// ── Redis 热路径 ──
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		PoolSize: 10,
+	})
+	log.Println("[main] Redis connected")
+
+	// ── Kafka ──
+	producer, err := repository.NewKafkaProducer([]string{"localhost:9092"})
+	if err != nil {
+		log.Fatalf("[main] Kafka producer failed: %v", err)
+	}
+	defer producer.Close()
+	log.Println("[main] Kafka producer connected")
+
+	repo := repository.NewRedisRepository(mysqlRepo, rdb, producer)
+
+	// Kafka consumer：消费 transaction complete 消息刷入 MySQL
+	consumer := repository.NewKafkaConsumer(mysqlRepo)
+	go func() {
+		if err := consumer.Start(context.Background(), []string{"localhost:9092"}); err != nil {
+			log.Printf("[main] Kafka consumer error: %v", err)
+		}
+	}()
+
+	// ── 共享存储层（Redis 热路径 + 内存缓存）──
 	store := coordinator.NewStore(repo)
 
-	// ── gRPC Server：监听 :9090，注册 TCCCoordinatorServer ──
+	// ── gRPC Server：监听 :9090 ──
 	grpcServer := grpc.NewServer()
 	coordpb.RegisterTCCCoordinatorServer(grpcServer, coordinator.NewGRPCServer(store))
 
@@ -57,24 +80,22 @@ func main() {
 			log.Fatalf("gRPC server failed: %v", err)
 		}
 	}()
+
 	// ── 超时恢复器 ──
-	// Scanner 定时（默认 10s）扫描 MySQL 中已超时的非终态事务，
-	// 交给 Recoverer 执行补偿 Cancel，避免资源永久悬挂。
-	// 仅在 MySQL 可用时启动（纯内存模式无需恢复，重启即清空）。
-	scannerCancel := func() {} // 默认空操作，MySQL 不可用时无 scanner 需停止
-	if repo != nil {
-		rec := recoverer.NewDefaultRecoverer(repo)
-		scanner := recoverer.NewTimeoutScanner(repo, rec, 10*myTime.MyTime)
+	// Scanner 定时扫描 Redis 中已超时的非终态事务，
+	// 交给 Recoverer 执行补偿 Cancel。
+	scannerCancel := func() {}
+	rec := recoverer.NewDefaultRecoverer(repo)
+	scanner := recoverer.NewTimeoutScanner(repo, rec, 10*myTime.MyTime)
 
-		var scannerCtx context.Context
-		scannerCtx, scannerCancel = context.WithCancel(context.Background())
+	var scannerCtx context.Context
+	scannerCtx, scannerCancel = context.WithCancel(context.Background())
 
-		go func() {
-			if err := scanner.Run(scannerCtx); err != nil {
-				log.Printf("[main] scanner exited: %v", err)
-			}
-		}()
-	}
+	go func() {
+		if err := scanner.Run(scannerCtx); err != nil {
+			log.Printf("[main] scanner exited: %v", err)
+		}
+	}()
 
 	// ── Gin HTTP Server：监听 :8080 ──
 	ginHandler := coordinator.NewGinHandler("127.0.0.1:9090", store)
@@ -101,18 +122,16 @@ func main() {
 	}()
 
 	// ── 优雅关闭 ──
-	// 捕获 SIGINT/SIGTERM，停止 scanner、关闭 gRPC 和 MySQL 连接池。
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
 	log.Println("[main] shutting down...")
-	scannerCancel()           // 停止扫描循环
-	grpcServer.GracefulStop() // 等待进行中的 RPC 完成
-	ginHandler.Close()        // 关闭 gRPC 客户端连接
+	scannerCancel()
+	grpcServer.GracefulStop()
+	ginHandler.Close()
 
-	if mysqlRepo != nil {
-		mysqlRepo.Close()
-	}
+	mysqlRepo.Close()
+	repo.Close()
 	log.Println("[main] shutdown complete")
 }

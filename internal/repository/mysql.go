@@ -48,7 +48,7 @@ var (
 // MySQLRepository 是 Repository 接口的 MySQL 实现。
 // 使用 database/sql 连接池，所有公开方法均接受 context 以支持超时和取消。
 type MySQLRepository struct {
-	db *sql.DB
+	DB *sql.DB
 }
 
 // NewMySQLRepository 创建 MySQL 仓储实例并验证数据库连通性。
@@ -72,7 +72,7 @@ func NewMySQLRepository(dsn string) (*MySQLRepository, error) {
 		db.Close()
 		return nil, fmt.Errorf("db.Ping: %w", err)
 	}
-	return &MySQLRepository{db: db}, nil
+	return &MySQLRepository{DB: db}, nil
 }
 
 // participantJSON 是 content 字段的内部序列化格式。
@@ -103,7 +103,7 @@ func (r *MySQLRepository) CreateTransaction(ctx context.Context, tx *model.Trans
 		return fmt.Errorf("marshal participants: %w", err)
 	}
 
-	dbTx, err := r.db.BeginTx(ctx, nil)
+	dbTx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("BeginTx: %w", err)
 	}
@@ -149,7 +149,7 @@ func (r *MySQLRepository) CreateTransaction(ctx context.Context, tx *model.Trans
 // 意义：先查 global_transaction 获取全局信息，再查 branch_transaction 获取分支列表，
 // 组装为完整的 Transaction 对象返回。两次查询在同一方法内，调用方获得的就是完整快照。
 func (r *MySQLRepository) GetTransaction(ctx context.Context, xid string) (*model.Transaction, error) {
-	row := r.db.QueryRowContext(ctx,
+	row := r.DB.QueryRowContext(ctx,
 		`SELECT xid, status, service_name, create_time, update_time, timeout, retry_count
 		 FROM global_transaction WHERE xid = ?`, xid)
 
@@ -169,7 +169,7 @@ func (r *MySQLRepository) GetTransaction(ctx context.Context, xid string) (*mode
 	}
 
 	// 查询所有分支
-	branchRows, err := r.db.QueryContext(ctx,
+	branchRows, err := r.DB.QueryContext(ctx,
 		`SELECT branch_id, xid, resource_id, status, try_data, create_time, update_time
 		 FROM branch_transaction WHERE xid = ? ORDER BY branch_id`, xid)
 	if err != nil {
@@ -229,7 +229,7 @@ func (r *MySQLRepository) GetTransaction(ctx context.Context, xid string) (*mode
 // loadContent 读取 global_transaction.content 并反序列化。
 func (r *MySQLRepository) loadContent(ctx context.Context, xid string, v *[]participantJSON) error {
 	var content sql.NullString
-	err := r.db.QueryRowContext(ctx,
+	err := r.DB.QueryRowContext(ctx,
 		`SELECT content FROM global_transaction WHERE xid = ?`, xid).Scan(&content)
 	if err != nil || !content.Valid || content.String == "" {
 		return err
@@ -242,7 +242,7 @@ func (r *MySQLRepository) loadContent(ctx context.Context, xid string, v *[]part
 // 意义：单字段更新，避免全量更新带来的锁竞争和网络开销。
 // 状态更新是最频繁的写操作（Try→Confirming→Completed 等），需要轻量高效。
 func (r *MySQLRepository) UpdateTransactionStatus(ctx context.Context, xid string, status model.TxStatus) error {
-	_, err := r.db.ExecContext(ctx,
+	_, err := r.DB.ExecContext(ctx,
 		`UPDATE global_transaction SET status = ?, update_time = ? WHERE xid = ?`,
 		txStatusToInt[status], time.Now(), xid)
 	if err != nil {
@@ -256,7 +256,7 @@ func (r *MySQLRepository) UpdateTransactionStatus(ctx context.Context, xid strin
 // 意义：分支状态在 Try→TryDone、TryDone→ConfirmDone/CancelDone 时更新，
 // 用 branch_id（全局自增唯一）精确定位，避免 xid + service_name 组合键的歧义。
 func (r *MySQLRepository) UpdateBranchStatus(ctx context.Context, branchID int64, status model.BranchStatus) error {
-	_, err := r.db.ExecContext(ctx,
+	_, err := r.DB.ExecContext(ctx,
 		`UPDATE branch_transaction SET status = ?, update_time = ? WHERE branch_id = ?`,
 		branchStatusToInt[status], time.Now(), branchID)
 	if err != nil {
@@ -275,7 +275,7 @@ func (r *MySQLRepository) UpdateBranchStatus(ctx context.Context, branchID int64
 //	WHERE status IN (0,1,2)                     — 非终态
 //	  AND TIMESTAMPDIFF(SECOND, update_time, NOW()) > timeout  — 已超时
 func (r *MySQLRepository) FindTimeOutTransactions(ctx context.Context) ([]*model.Transaction, error) {
-	rows, err := r.db.QueryContext(ctx,
+	rows, err := r.DB.QueryContext(ctx,
 		`SELECT xid, status, service_name, create_time, update_time, timeout, retry_count
 		 FROM global_transaction
 		 WHERE status IN (0, 1, 2)
@@ -317,7 +317,7 @@ func (r *MySQLRepository) FindTimeOutTransactions(ctx context.Context) ([]*model
 // 意义：前端列表页和 GinHandler.ListTransactions 使用此方法。
 // 只返回全局事务的摘要字段，分支详情由 GetTransaction 按需查询。
 func (r *MySQLRepository) ListTransactions(ctx context.Context) ([]*model.Transaction, error) {
-	rows, err := r.db.QueryContext(ctx,
+	rows, err := r.DB.QueryContext(ctx,
 		`SELECT xid, status, service_name, create_time, update_time, timeout, retry_count
 		 FROM global_transaction
 		 ORDER BY create_time DESC LIMIT 500`)
@@ -350,7 +350,7 @@ func (r *MySQLRepository) ListTransactions(ctx context.Context) ([]*model.Transa
 		// 加载参与者信息以获取分支数量和服务名
 		var participants []participantJSON
 		var content sql.NullString
-		if err := r.db.QueryRowContext(ctx,
+		if err := r.DB.QueryRowContext(ctx,
 			`SELECT content FROM global_transaction WHERE xid = ?`, xid).Scan(&content); err == nil && content.Valid {
 			if json.Unmarshal([]byte(content.String), &participants) == nil {
 				for _, p := range participants {
@@ -368,7 +368,7 @@ func (r *MySQLRepository) ListTransactions(ctx context.Context) ([]*model.Transa
 
 // Close 关闭数据库连接池。
 func (r *MySQLRepository) Close() error {
-	return r.db.Close()
+	return r.DB.Close()
 }
 
 // buildPlaceholders 生成 (?, ?, ?) 形式的占位符串，用于批量 INSERT。
@@ -382,11 +382,11 @@ func buildPlaceholders(n, cols int) string {
 }
 
 func (r *MySQLRepository) ClearAllTransactions(ctx context.Context) error {
-	_, err := r.db.ExecContext(ctx, "DELETE FROM global_transaction where true")
+	_, err := r.DB.ExecContext(ctx, "DELETE FROM global_transaction where true")
 	if err != nil {
 		return fmt.Errorf("clear all transactions: %w", err)
 	}
-	_, err = r.db.ExecContext(ctx, "DELETE FROM branch_transaction WHERE true")
+	_, err = r.DB.ExecContext(ctx, "DELETE FROM branch_transaction WHERE true")
 	if err != nil {
 		return fmt.Errorf("clear all branch transactions: %w", err)
 	}
@@ -394,7 +394,7 @@ func (r *MySQLRepository) ClearAllTransactions(ctx context.Context) error {
 }
 
 func (r *MySQLRepository) AddRetryCount(ctx context.Context, id string) error {
-	_, err := r.db.ExecContext(ctx, "UPDATE global_transaction SET retry_count = retry_count + 1 WHERE xid=?", id)
+	_, err := r.DB.ExecContext(ctx, "UPDATE global_transaction SET retry_count = retry_count + 1 WHERE xid=?", id)
 	if err != nil {
 		return fmt.Errorf("add retry count: %w", err)
 	}
@@ -402,7 +402,7 @@ func (r *MySQLRepository) AddRetryCount(ctx context.Context, id string) error {
 }
 
 func (r *MySQLRepository) GetBranchTransaction(ctx context.Context, id int64) (model.BranchStatus, error) {
-	rows, err := r.db.QueryContext(ctx, "SELECT status FROM branch_transaction WHERE branch_id=?", id)
+	rows, err := r.DB.QueryContext(ctx, "SELECT status FROM branch_transaction WHERE branch_id=?", id)
 	if err != nil {
 		return "", fmt.Errorf("GetBranchTransaction: %w", err)
 	}
@@ -418,7 +418,7 @@ func (r *MySQLRepository) GetBranchTransaction(ctx context.Context, id int64) (m
 }
 
 func (r *MySQLRepository) UpdateBranchTransaction(ctx context.Context, id int64, status model.BranchStatus) error {
-	rows, err := r.db.ExecContext(ctx, "UPDATE branch_transaction SET status=? WHERE branch_id=?", branchStatusToInt[status], id)
+	rows, err := r.DB.ExecContext(ctx, "UPDATE branch_transaction SET status=? WHERE branch_id=?", branchStatusToInt[status], id)
 	if err != nil {
 		return fmt.Errorf("UpdateBranchTransaction: %w", err)
 	}

@@ -42,7 +42,7 @@ func (s *Server) Try(ctx context.Context, req *pb.TryRequest) (*pb.TryResponse, 
 	}
 	order.Id = req.BranchId
 	order.Status = 0 // pending
-	if err := s.repo.OrderTry(ctx, order); err != nil {
+	if err := s.repo.OrderTry(ctx, req.BranchId, req.Xid, order); err != nil {
 		return &pb.TryResponse{Success: false, Error: "TryError"}, err
 	}
 
@@ -58,7 +58,7 @@ func (s *Server) Confirm(ctx context.Context, req *pb.ConfirmRequest) (*pb.Confi
 	if err := json.Unmarshal([]byte(req.ResourceData), &order); err != nil {
 		return &pb.ConfirmResponse{Success: false, Error: "invalid resource_data"}, nil
 	}
-	if err := s.repo.OrderConfirm(ctx, order); err != nil {
+	if err := s.repo.OrderConfirm(ctx, req.BranchId, req.Xid, order); err != nil {
 		return &pb.ConfirmResponse{Success: false, Error: "ConfirmError"}, err
 	}
 
@@ -75,7 +75,7 @@ func (s *Server) Cancel(ctx context.Context, req *pb.CancelRequest) (*pb.CancelR
 		return &pb.CancelResponse{Success: false, Error: "invalid resource_data"}, nil
 	}
 	order.Id = req.BranchId
-	if err := s.repo.OrderCancel(ctx, order); err != nil {
+	if err := s.repo.OrderCancel(ctx, req.BranchId, req.Xid, order); err != nil {
 		return &pb.CancelResponse{Success: false}, err
 	}
 	if err := s.repo.UpdateBranchTransaction(ctx, req.BranchId, model.BranchCancelDone); err != nil {

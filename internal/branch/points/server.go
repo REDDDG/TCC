@@ -40,7 +40,7 @@ func (s *Server) Try(ctx context.Context, req *pb.TryRequest) (*pb.TryResponse, 
 	if err := json.Unmarshal([]byte(req.ResourceData), &account); err != nil {
 		return &pb.TryResponse{Success: false, Error: "invalid resource_data"}, nil
 	}
-	if err := s.repo.PointsTry(ctx, account); err != nil {
+	if err := s.repo.PointsTry(ctx, req.BranchId, req.Xid, account); err != nil {
 		return &pb.TryResponse{Success: false, Error: "TryError"}, err
 	}
 
@@ -56,7 +56,7 @@ func (s *Server) Confirm(ctx context.Context, req *pb.ConfirmRequest) (*pb.Confi
 	if err := json.Unmarshal([]byte(req.ResourceData), &account); err != nil {
 		return &pb.ConfirmResponse{Success: false, Error: "invalid resource_data"}, nil
 	}
-	if err := s.repo.PointsConfirm(ctx, account); err != nil {
+	if err := s.repo.PointsConfirm(ctx, req.BranchId, req.Xid, account); err != nil {
 		return &pb.ConfirmResponse{Success: false, Error: "ConfirmError"}, err
 	}
 	if err := s.repo.UpdateBranchTransaction(ctx, req.BranchId, model.BranchConfirmDone); err != nil {
@@ -71,7 +71,7 @@ func (s *Server) Cancel(ctx context.Context, req *pb.CancelRequest) (*pb.CancelR
 	if err := json.Unmarshal([]byte(req.ResourceData), &account); err != nil {
 		return &pb.CancelResponse{Success: false, Error: "invalid resource_data"}, nil
 	}
-	if err := s.repo.PointsCancel(ctx, account); err != nil {
+	if err := s.repo.PointsCancel(ctx, req.BranchId, req.Xid, account); err != nil {
 		return &pb.CancelResponse{Success: false}, err
 	}
 	if err := s.repo.UpdateBranchTransaction(ctx, req.BranchId, model.BranchCancelDone); err != nil {

@@ -1,40 +1,57 @@
-// 积分服务入口：启动 BranchService gRPC server，监听 :9093。
-// 模拟 TCC 分支服务，提供 Try/Confirm/Cancel 三阶段资源操作。
 package main
 
 import (
+	"context"
 	"log"
 	"net"
 	"os"
+
 	"tcc/internal/branch/points"
 	"tcc/internal/repository"
 
 	pb "tcc/api/proto/branch"
 
+	"github.com/redis/go-redis/v9"
 	"google.golang.org/grpc"
 )
 
-// main 注册 BranchServiceServer 并启动 gRPC server，阻塞直到进程退出。
 func main() {
-	lis, err := net.Listen("tcp", ":9093")
+	lis, err := net.Listen("tcp", ":8083")
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
 	dsn := os.Getenv("MYSQL_DSN")
 	if dsn == "" {
-		//仅在开发学习中直接写入密码
 		dsn = "root:mysql12138@tcp(127.0.0.1:3306)/tcc?parseTime=true"
 	}
 
-	var repo repository.Repository
 	mysqlRepo, err := repository.NewMySQLRepository(dsn)
 	if err != nil {
-		log.Printf("[main] MySQL not available (%v), falling back to in-memory mode", err)
-	} else {
-		repo = mysqlRepo
-		log.Println("[main] MySQL connected, tables ensured")
+		log.Fatalf("[main] MySQL not available: %v", err)
 	}
+	log.Println("[main] MySQL connected, tables ensured")
+
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		PoolSize: 10,
+	})
+
+	producer, err := repository.NewKafkaProducer([]string{"localhost:9092"})
+	if err != nil {
+		log.Fatalf("[main] Kafka producer failed: %v", err)
+	}
+	defer producer.Close()
+	log.Println("[main] Kafka producer connected")
+
+	repo := repository.NewRedisRepository(mysqlRepo, rdb, producer)
+
+	consumer := repository.NewKafkaConsumer(mysqlRepo)
+	go func() {
+		if err := consumer.Start(context.Background(), []string{"localhost:9092"}); err != nil {
+			log.Printf("[main] Kafka consumer error: %v", err)
+		}
+	}()
 
 	s := grpc.NewServer()
 	pb.RegisterBranchServiceServer(s, points.NewServer("PointsService", repo))
