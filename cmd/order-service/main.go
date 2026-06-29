@@ -44,7 +44,7 @@ func main() {
 	defer producer.Close()
 	log.Println("[main] Kafka producer connected")
 
-	repo := repository.NewRedisRepository(mysqlRepo, rdb, producer)
+	repo := repository.NewRedisRepository(rdb, producer)
 
 	consumer := repository.NewKafkaConsumer(mysqlRepo)
 	go func() {

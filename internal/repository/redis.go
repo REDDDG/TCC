@@ -93,13 +93,12 @@ return qty
 //	try:pts:{branch_id}        → String qty (TTL 300s)
 
 type RedisRepository struct {
-	mysql    *MySQLRepository
 	rdb      *redis.Client
 	producer *KafkaProducer
 }
 
-func NewRedisRepository(mysql *MySQLRepository, rdb *redis.Client, producer *KafkaProducer) *RedisRepository {
-	return &RedisRepository{mysql: mysql, rdb: rdb, producer: producer}
+func NewRedisRepository(rdb *redis.Client, producer *KafkaProducer) *RedisRepository {
+	return &RedisRepository{rdb: rdb, producer: producer}
 }
 
 // --- Inventory ---

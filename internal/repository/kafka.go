@@ -129,7 +129,7 @@ func (c *KafkaConsumer) handleInventory(ctx context.Context, msg SyncMessage) er
 	case "confirm":
 		qty, _ := strconv.Atoi(msg.Data)
 		result, err := c.mysql.DB.ExecContext(ctx,
-			"UPDATE inventory_stock SET total = total - ?, version = ?, updated_at = NOW() WHERE product_id = ? AND version < ?",
+			"UPDATE inventory_stock SET total = total - ?, version = ?, updated_at = NOW() WHERE product_id = ?",
 			qty, msg.Version, msg.ResourceID, msg.Version)
 		if err != nil {
 			return err
@@ -167,7 +167,7 @@ func (c *KafkaConsumer) handlePoints(ctx context.Context, msg SyncMessage) error
 	case "confirm":
 		qty, _ := strconv.Atoi(msg.Data)
 		result, err := c.mysql.DB.ExecContext(ctx,
-			"UPDATE points_account SET balance = balance - ?, version = ?, updated_at = NOW() WHERE user_id = ? AND version < ?",
+			"UPDATE points_account SET balance = balance - ?, version = ?, updated_at = NOW() WHERE user_id = ?",
 			qty, msg.Version, msg.ResourceID, msg.Version)
 		if err != nil {
 			return err
