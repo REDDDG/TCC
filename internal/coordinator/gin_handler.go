@@ -46,6 +46,7 @@ func (h *GinHandler) CreateTransaction(c *gin.Context) {
 			ServiceName  string `json:"service_name"`
 			ResourceData string `json:"resource_data"`
 			Address      string `json:"address"`
+			Value        int64  `json:"value"`
 		} `json:"participants"`
 		Timeout int32 `json:"timeout"`
 	}
@@ -63,6 +64,7 @@ func (h *GinHandler) CreateTransaction(c *gin.Context) {
 			ServiceName:  p.ServiceName,
 			ResourceData: p.ResourceData,
 			Address:      p.Address,
+			Value:        p.Value,
 		}
 	}
 	resp, err := h.client.Begin(ctx, &coordpb.BeginRequest{

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"tcc/internal/model"
@@ -12,17 +13,62 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-const luaTryDecr = `
-local key = KEYS[1]
-local try_key = KEYS[2]
+// luaTry 实现 frozen 模式：Try 阶段只冻结金额、不递增 version。
+//
+//	KEYS[1] = balance key  (inventory:{pid} / points:{uid})
+//	KEYS[2] = frozen key   (inv:frozen:{pid} / pts:frozen:{uid})
+//	KEYS[3] = try key      (try:inv:{bid} / try:pts:{bid})
+//	ARGV[1] = qty
+//	返回: 1 成功; 0 余额不足
+//
+//	检查逻辑: current - frozen - qty >= 0
+const luaTry = `
+local current = tonumber(redis.call('GET', KEYS[1]) or '0')
+local frozen = tonumber(redis.call('GET', KEYS[2]) or '0')
 local qty = tonumber(ARGV[1])
-local current = redis.call('GET', key)
-if current and tonumber(current) >= qty then
-    redis.call('DECRBY', key, qty)
-    redis.call('SET', try_key, ARGV[1], 'EX', 300)
+
+if current - frozen - qty >= 0 then
+    redis.call('INCRBY', KEYS[2], qty)
+    redis.call('SET', KEYS[3], qty, 'EX', 300)
     return 1
 end
 return 0
+`
+
+// luaConfirm 确认阶段：扣减余额、解冻、递增 version，返回 "qty:new_version"。
+//
+//	KEYS[1] = balance key
+//	KEYS[2] = frozen key
+//	KEYS[3] = version key
+//	KEYS[4] = try key
+const luaConfirm = `
+local qty_str = redis.call('GET', KEYS[4])
+if not qty_str then
+    return false
+end
+local qty = tonumber(qty_str)
+
+local version = redis.call('INCR', KEYS[3])
+redis.call('DECRBY', KEYS[1], qty)
+redis.call('DECRBY', KEYS[2], qty)
+redis.call('DEL', KEYS[4])
+return qty .. ':' .. version
+`
+
+// luaCancel 取消阶段：只解冻冻结金额，不触碰余额（Try 阶段未实际扣减）。
+//
+//	KEYS[1] = frozen key
+//	KEYS[2] = try key
+const luaCancel = `
+local qty_str = redis.call('GET', KEYS[2])
+if not qty_str then
+    return 0
+end
+local qty = tonumber(qty_str)
+
+redis.call('DECRBY', KEYS[1], qty)
+redis.call('DEL', KEYS[2])
+return qty
 `
 
 // Redis 数据结构：
@@ -33,6 +79,18 @@ return 0
 //	tx:{xid}                   → Hash  {status, timeout, retry_count, create_time, update_time}
 //	tx:{xid}:branches          → Set   (该事务的所有 branch_id)
 //	tx:{xid}:br:{branch_id}    → Hash  {service_name, address, resource_data, status, try_data, create_time, update_time}
+//
+//	--- Inventory (frozen + version 乐观锁) ---
+//	inventory:{product_id}     → String 当前可用库存
+//	inv:frozen:{product_id}    → String 未确认的冻结扣减总额
+//	inv:version:{product_id}   → String 版本号（每次 Confirm 自增，用于 Kafka 消费者乐观锁）
+//	try:inv:{branch_id}        → String qty (TTL 300s)
+//
+//	--- Points (frozen + version 乐观锁) ---
+//	points:{user_id}           → String 当前可用积分
+//	pts:frozen:{user_id}       → String 未确认的冻结积分总额
+//	pts:version:{user_id}      → String 版本号（每次 Confirm 自增）
+//	try:pts:{branch_id}        → String qty (TTL 300s)
 
 type RedisRepository struct {
 	mysql    *MySQLRepository
@@ -46,10 +104,12 @@ func NewRedisRepository(mysql *MySQLRepository, rdb *redis.Client, producer *Kaf
 
 // --- Inventory ---
 
-func (r *RedisRepository) InventoryTry(ctx context.Context, branchId int64, xid string, productId string) error {
+func (r *RedisRepository) InventoryTry(ctx context.Context, branchId int64, value int64, productId string) error {
 	key := "inventory:" + productId
+	frozenKey := "inv:frozen:" + productId
 	tryKey := fmt.Sprintf("try:inv:%d", branchId)
-	result, err := r.rdb.Eval(ctx, luaTryDecr, []string{key, tryKey}, "1").Result()
+
+	result, err := r.rdb.Eval(ctx, luaTry, []string{key, frozenKey, tryKey}, value).Result()
 	if err != nil {
 		return fmt.Errorf("redis try: %w", err)
 	}
@@ -59,44 +119,59 @@ func (r *RedisRepository) InventoryTry(ctx context.Context, branchId int64, xid 
 	return nil
 }
 
-func (r *RedisRepository) InventoryConfirm(ctx context.Context, branchId int64, xid string, productId string) error {
+func (r *RedisRepository) InventoryConfirm(ctx context.Context, branchId int64, productId string) error {
+	key := "inventory:" + productId
+	frozenKey := "inv:frozen:" + productId
+	versionKey := "inv:version:" + productId
 	tryKey := fmt.Sprintf("try:inv:%d", branchId)
-	qty, err := r.rdb.Get(ctx, tryKey).Result()
+
+	result, err := r.rdb.Eval(ctx, luaConfirm, []string{key, frozenKey, versionKey, tryKey}).Result()
 	if err != nil {
-		return fmt.Errorf("get try record: %w", err)
+		return fmt.Errorf("redis confirm: %w", err)
 	}
+	if result == nil {
+		return fmt.Errorf("try record not found for branch %d", branchId)
+	}
+
+	parts := strings.SplitN(result.(string), ":", 2)
+	qty := parts[0]
+	version, _ := strconv.Atoi(parts[1])
+
 	if err := r.producer.Send(ctx, SyncMessage{
 		BranchID:   branchId,
 		Service:    "inventory",
 		Phase:      "confirm",
 		ResourceID: productId,
 		Data:       qty,
+		Version:    version,
 	}); err != nil {
 		return fmt.Errorf("kafka send: %w", err)
 	}
-	r.rdb.Del(ctx, tryKey)
 	return nil
 }
 
-func (r *RedisRepository) InventoryCancel(ctx context.Context, branchId int64, xid string, productId string) error {
-	key := "inventory:" + productId
+func (r *RedisRepository) InventoryCancel(ctx context.Context, branchId int64, productId string) error {
+	frozenKey := "inv:frozen:" + productId
 	tryKey := fmt.Sprintf("try:inv:%d", branchId)
-	qty, err := r.rdb.Get(ctx, tryKey).Result()
+
+	result, err := r.rdb.Eval(ctx, luaCancel, []string{frozenKey, tryKey}).Result()
 	if err != nil {
-		return fmt.Errorf("get try record for cancel: %w", err)
+		return fmt.Errorf("redis cancel: %w", err)
 	}
-	qtyInt, _ := strconv.ParseInt(qty, 10, 64)
-	r.rdb.IncrBy(ctx, key, qtyInt)
-	r.rdb.Del(ctx, tryKey)
+	if result.(int64) == 0 {
+		return fmt.Errorf("try record not found for branch %d", branchId)
+	}
 	return nil
 }
 
 // --- Points ---
 
-func (r *RedisRepository) PointsTry(ctx context.Context, branchId int64, xid string, account model.PointsAccount) error {
+func (r *RedisRepository) PointsTry(ctx context.Context, branchId int64, value int64, account model.PointsAccount) error {
 	key := "points:" + account.UserID
+	frozenKey := "pts:frozen:" + account.UserID
 	tryKey := fmt.Sprintf("try:pts:%d", branchId)
-	result, err := r.rdb.Eval(ctx, luaTryDecr, []string{key, tryKey}, "1").Result()
+
+	result, err := r.rdb.Eval(ctx, luaTry, []string{key, frozenKey, tryKey}, value).Result()
 	if err != nil {
 		return fmt.Errorf("redis try: %w", err)
 	}
@@ -106,35 +181,48 @@ func (r *RedisRepository) PointsTry(ctx context.Context, branchId int64, xid str
 	return nil
 }
 
-func (r *RedisRepository) PointsConfirm(ctx context.Context, branchId int64, xid string, account model.PointsAccount) error {
+func (r *RedisRepository) PointsConfirm(ctx context.Context, branchId int64, account model.PointsAccount) error {
+	key := "points:" + account.UserID
+	frozenKey := "pts:frozen:" + account.UserID
+	versionKey := "pts:version:" + account.UserID
 	tryKey := fmt.Sprintf("try:pts:%d", branchId)
-	qty, err := r.rdb.Get(ctx, tryKey).Result()
+
+	result, err := r.rdb.Eval(ctx, luaConfirm, []string{key, frozenKey, versionKey, tryKey}).Result()
 	if err != nil {
-		return fmt.Errorf("get try record: %w", err)
+		return fmt.Errorf("redis confirm: %w", err)
 	}
+	if result == nil {
+		return fmt.Errorf("try record not found for branch %d", branchId)
+	}
+
+	parts := strings.SplitN(result.(string), ":", 2)
+	qty := parts[0]
+	version, _ := strconv.Atoi(parts[1])
+
 	if err := r.producer.Send(ctx, SyncMessage{
 		BranchID:   branchId,
 		Service:    "points",
 		Phase:      "confirm",
 		ResourceID: account.UserID,
 		Data:       qty,
+		Version:    version,
 	}); err != nil {
 		return fmt.Errorf("kafka send: %w", err)
 	}
-	r.rdb.Del(ctx, tryKey)
 	return nil
 }
 
-func (r *RedisRepository) PointsCancel(ctx context.Context, branchId int64, xid string, account model.PointsAccount) error {
-	key := "points:" + account.UserID
+func (r *RedisRepository) PointsCancel(ctx context.Context, branchId int64, account model.PointsAccount) error {
+	frozenKey := "pts:frozen:" + account.UserID
 	tryKey := fmt.Sprintf("try:pts:%d", branchId)
-	qty, err := r.rdb.Get(ctx, tryKey).Result()
+
+	result, err := r.rdb.Eval(ctx, luaCancel, []string{frozenKey, tryKey}).Result()
 	if err != nil {
-		return fmt.Errorf("get try record for cancel: %w", err)
+		return fmt.Errorf("redis cancel: %w", err)
 	}
-	qtyInt, _ := strconv.ParseInt(qty, 10, 64)
-	r.rdb.IncrBy(ctx, key, qtyInt)
-	r.rdb.Del(ctx, tryKey)
+	if result.(int64) == 0 {
+		return fmt.Errorf("try record not found for branch %d", branchId)
+	}
 	return nil
 }
 

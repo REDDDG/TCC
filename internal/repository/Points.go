@@ -7,8 +7,8 @@ import (
 	"time"
 )
 
-func (r *MySQLRepository) PointsTry(ctx context.Context, branchId int64, xid string, account model.PointsAccount) error {
-	cnt, err := r.DB.ExecContext(ctx, "UPDATE points_account SET  balance = balance - 1 WHERE user_id = ? AND balance >= 1", account.UserID)
+func (r *MySQLRepository) PointsTry(ctx context.Context, branchId int64, value int64, account model.PointsAccount) error {
+	cnt, err := r.DB.ExecContext(ctx, "UPDATE points_account SET  balance = balance - ? WHERE user_id = ?", value, account.UserID)
 	if err != nil {
 		return err
 	}
@@ -19,7 +19,7 @@ func (r *MySQLRepository) PointsTry(ctx context.Context, branchId int64, xid str
 	return fmt.Errorf("points try %d failed", nums)
 }
 
-func (r *MySQLRepository) PointsConfirm(ctx context.Context, branchId int64, xid string, account model.PointsAccount) error {
+func (r *MySQLRepository) PointsConfirm(ctx context.Context, branchId int64, account model.PointsAccount) error {
 	_, err := r.DB.ExecContext(ctx, "UPDATE points_account SET updated_at=? where user_id = ? ", time.Now(), account.UserID)
 	if err != nil {
 		return err
@@ -27,7 +27,7 @@ func (r *MySQLRepository) PointsConfirm(ctx context.Context, branchId int64, xid
 	return nil
 }
 
-func (r *MySQLRepository) PointsCancel(ctx context.Context, branchId int64, xid string, account model.PointsAccount) error {
+func (r *MySQLRepository) PointsCancel(ctx context.Context, branchId int64, account model.PointsAccount) error {
 	_, err := r.DB.ExecContext(ctx, "UPDATE points_account SET  balance = balance + 1,updated_at=? WHERE user_id = ?", time.Now(), account.UserID)
 	if err != nil {
 		return err

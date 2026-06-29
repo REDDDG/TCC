@@ -61,7 +61,7 @@ func (s *GRPCServer) Begin(ctx context.Context, req *coordpb.BeginRequest) (*coo
 	allOK := true
 
 	for i, p := range req.Participants {
-		err := s.callBranchTry(branches[i], xid, p.ResourceData, p.Address)
+		err := s.callBranchTry(branches[i], xid, p.ResourceData, p.Address, p.Value)
 		if err != nil {
 			results[i] = &coordpb.BranchResult{ServiceName: p.ServiceName, Success: false, Error: err.Error()}
 			allOK = false
@@ -201,7 +201,7 @@ func (s *GRPCServer) GetStatus(ctx context.Context, req *coordpb.StatusRequest) 
 //   - resourceData: 需要预留的资源描述
 //   - addr: 分支 gRPC 地址，如 "localhost:9091"
 //   - 返回: nil 表示 Try 预留成功；非 nil 表示网络错误或业务拒绝
-func (s *GRPCServer) callBranchTry(br *model.BranchTransaction, xid, resourceData, addr string) error {
+func (s *GRPCServer) callBranchTry(br *model.BranchTransaction, xid, resourceData, addr string, value int64) error {
 	client, err := s.getBranchClient(addr)
 	if err != nil {
 		return fmt.Errorf("getBranchClient %s: %w", addr, err)
@@ -209,7 +209,7 @@ func (s *GRPCServer) callBranchTry(br *model.BranchTransaction, xid, resourceDat
 	ctx, cancel := context.WithTimeout(context.Background(), 3*myTime.MyTime)
 	defer cancel()
 	start := time.Now()
-	resp, err := client.Try(ctx, &branchpb.TryRequest{BranchId: br.BranchID, ResourceData: resourceData, Xid: xid})
+	resp, err := client.Try(ctx, &branchpb.TryRequest{BranchId: br.BranchID, ResourceData: resourceData, Xid: xid, Val: value})
 	fmt.Println("clientCallBranchTry:", time.Since(start))
 	if err != nil {
 		return fmt.Errorf("try rpc: %w", err)

@@ -56,7 +56,7 @@ func main() {
 	s := grpc.NewServer()
 	pb.RegisterBranchServiceServer(s, order.NewServer("OrderService", repo))
 
-	log.Println("Order service listening on :9091")
+	log.Println("Order service listening on :8081")
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}

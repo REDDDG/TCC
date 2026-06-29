@@ -35,7 +35,7 @@ func (s *Server) Try(ctx context.Context, req *pb.TryRequest) (*pb.TryResponse, 
 		return &pb.TryResponse{Success: false, Error: "StatusCancel"}, nil
 	}
 
-	if err := s.repo.InventoryTry(ctx, req.BranchId, req.Xid, req.ResourceData); err != nil {
+	if err := s.repo.InventoryTry(ctx, req.BranchId, req.Val, req.ResourceData); err != nil {
 		return &pb.TryResponse{Success: false, Error: "TryError"}, err
 	}
 
@@ -47,7 +47,7 @@ func (s *Server) Try(ctx context.Context, req *pb.TryRequest) (*pb.TryResponse, 
 
 // Confirm 实现 TCC 的 Confirm 阶段：确认提交已预留的资源。
 func (s *Server) Confirm(ctx context.Context, req *pb.ConfirmRequest) (*pb.ConfirmResponse, error) {
-	if err := s.repo.InventoryConfirm(ctx, req.BranchId, req.Xid, req.ResourceData); err != nil {
+	if err := s.repo.InventoryConfirm(ctx, req.BranchId, req.ResourceData); err != nil {
 		return &pb.ConfirmResponse{Success: false, Error: "ConfirmError"}, err
 	}
 
@@ -59,7 +59,7 @@ func (s *Server) Confirm(ctx context.Context, req *pb.ConfirmRequest) (*pb.Confi
 
 // Cancel 实现 TCC 的 Cancel 阶段：回滚已预留的资源。
 func (s *Server) Cancel(ctx context.Context, req *pb.CancelRequest) (*pb.CancelResponse, error) {
-	if err := s.repo.InventoryCancel(ctx, req.BranchId, req.Xid, req.ResourceData); err != nil {
+	if err := s.repo.InventoryCancel(ctx, req.BranchId, req.ResourceData); err != nil {
 		return &pb.CancelResponse{Success: false}, err
 	}
 	if err := s.repo.UpdateBranchTransaction(ctx, req.BranchId, model.BranchCancelDone); err != nil {

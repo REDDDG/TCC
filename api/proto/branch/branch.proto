@@ -13,6 +13,7 @@ message TryRequest {
   int64 branch_id = 1;
   string resource_data = 2;
   string xid = 3;
+  int64 val =4;
 }
 
 message TryResponse {

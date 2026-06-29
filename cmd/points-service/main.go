@@ -56,7 +56,7 @@ func main() {
 	s := grpc.NewServer()
 	pb.RegisterBranchServiceServer(s, points.NewServer("PointsService", repo))
 
-	log.Println("Points service listening on :9093")
+	log.Println("Points service listening on :8083")
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}
